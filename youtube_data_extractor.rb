@@ -24,7 +24,7 @@
 require 'json'
 require 'nokogiri'
 require 'net/http'
-require 'byebug'
+require 'pry'
 require 'terminal-table'
 
 def extract_yt_initial_player_response(youtube_url)
@@ -61,27 +61,85 @@ begin
   url = gets.chomp
   tag = extract_yt_initial_player_response(url)
   result = tag_to_json(tag)
-
-  print "Author: "
-  puts result["playerOverlays"]["playerOverlayRenderer"]["videoDetails"]["playerOverlayVideoDetailsRenderer"]["subtitle"]["runs"][0]["text"].encode("iso-8859-1").force_encoding("utf-8")
-  print "Title: "
-  puts result["playerOverlays"]["playerOverlayRenderer"]["videoDetails"]["playerOverlayVideoDetailsRenderer"]["title"]["simpleText"].encode("iso-8859-1").force_encoding("utf-8")
-
   video_data = []
-  result["contents"]["twoColumnWatchNextResults"]["secondaryResults"]["secondaryResults"]["results"].each_with_index do |item, index|
-    compactVideoRenderer = item["compactVideoRenderer"]
-    next unless compactVideoRenderer
+  short_video_data = []
+  radio_data = []
+  shelf_data = []
+  video_index = 0
+  short_index = 0
+  radio_index = 0
+  shelf_index = 0
 
-    title = compactVideoRenderer["title"]["simpleText"].encode("iso-8859-1").force_encoding("utf-8") rescue "No title"
-    author = compactVideoRenderer["longBylineText"]["runs"][0]["text"].encode("iso-8859-1").force_encoding("utf-8") rescue "No author"
-    duration = compactVideoRenderer["thumbnailOverlays"][0]["thumbnailOverlayTimeStatusRenderer"]["text"]["simpleText"] rescue "No duration"
+  if url.include?("search_query")
+    # Searching for the video
+    result["contents"]["twoColumnSearchResultsRenderer"]["primaryContents"]["sectionListRenderer"]["contents"][0]["itemSectionRenderer"]["contents"].each do |content|
+      if content["reelShelfRenderer"]
+        content["reelShelfRenderer"]["items"].each do |item|
+          title = item["reelItemRenderer"]["headline"]["simpleText"].encode("iso-8859-1").force_encoding("utf-8") rescue "No title"
+          view_count = item["reelItemRenderer"]["viewCountText"]["simpleText"].encode("iso-8859-1").force_encoding("utf-8") rescue "No view count"
+          short_index += 1
+          short_video_data << [short_index, title, "-", "-", view_count, "reel"]
+        end
+      elsif content["radioRenderer"]
+        content["radioRenderer"]["videos"].each do |video|
+          title = video["childVideoRenderer"]["title"]["simpleText"]
+          duration = video["childVideoRenderer"]["lengthText"]["simpleText"]
+          radio_index += 1
+          radio_data << [radio_index, title, "-", duration, "-", "radio"]
+        end
+      elsif content["shelfRenderer"]
+        content["shelfRenderer"]["content"]["verticalListRenderer"]["items"].each do |item|
+          title = item["videoRenderer"]["title"]["runs"][0]["text"].encode("iso-8859-1").force_encoding("utf-8") rescue "No title"
+          author = item["videoRenderer"]["longBylineText"]["runs"][0]["text"].encode("iso-8859-1").force_encoding("utf-8") rescue "No author"
+          duration = item["videoRenderer"]["thumbnailOverlays"][0]["thumbnailOverlayTimeStatusRenderer"]["text"]["simpleText"].encode("iso-8859-1").force_encoding("utf-8") rescue "No duration"
+          view_count = item["videoRenderer"]["shortViewCountText"]["simpleText"].encode("iso-8859-1").force_encoding("utf-8") rescue "No view count"
+          shelf_index += 1
+          shelf_data << [shelf_index, title, author, duration, view_count, "shelf"]
+        end
+      else
+        video_title = content["videoRenderer"]["title"]["runs"][0]["text"].encode("iso-8859-1").force_encoding("utf-8") rescue "No title"
+        author = content["videoRenderer"]["longBylineText"]["runs"][0]["text"].encode("iso-8859-1").force_encoding("utf-8") rescue "No author"
+        duration = content["videoRenderer"]["thumbnailOverlays"][0]["thumbnailOverlayTimeStatusRenderer"]["text"]["simpleText"].encode("iso-8859-1").force_encoding("utf-8") rescue "No duration"
+        view_count = content["videoRenderer"]["shortViewCountText"]["simpleText"].encode("iso-8859-1").force_encoding("utf-8") rescue "No view count"
+        video_index += 1
+        video_data << [video_index, video_title, author, duration, view_count, "video"]
+      end
+    end
 
-    video_data << [index + 1, title, author, duration]
+    table = Terminal::Table.new :headings => ['No', 'Title', 'Author', 'Duration', 'View count', 'Type'], :rows => video_data
+    short_video_table = Terminal::Table.new :headings => ['No', 'Title', 'Author', 'Duration', 'View count', 'Type'], :rows => short_video_data
+    radio_table = Terminal::Table.new :headings => ['No', 'Title', 'Author', 'Duration', 'View count', 'Type'], :rows => radio_data
+    shelf_table = Terminal::Table.new :headings => ['No', 'Title', 'Author', 'Duration', 'View count', 'Type'], :rows => shelf_data
+    puts "Long video: "
+    puts table
+    puts "Short video: "
+    puts short_video_table
+    puts "Radio: "
+    puts radio_table
+    puts "Shelf: "
+    puts shelf_table
+  else
+    print "Author: "
+    puts result["playerOverlays"]["playerOverlayRenderer"]["videoDetails"]["playerOverlayVideoDetailsRenderer"]["subtitle"]["runs"][0]["text"].encode("iso-8859-1").force_encoding("utf-8")
+    print "Title: "
+    puts result["playerOverlays"]["playerOverlayRenderer"]["videoDetails"]["playerOverlayVideoDetailsRenderer"]["title"]["simpleText"].encode("iso-8859-1").force_encoding("utf-8")
+
+    video_data = []
+    result["contents"]["twoColumnWatchNextResults"]["secondaryResults"]["secondaryResults"]["results"].each_with_index do |item, index|
+      compactVideoRenderer = item["compactVideoRenderer"]
+      next unless compactVideoRenderer
+
+      title = compactVideoRenderer["title"]["simpleText"].encode("iso-8859-1").force_encoding("utf-8") rescue "No title"
+      author = compactVideoRenderer["longBylineText"]["runs"][0]["text"].encode("iso-8859-1").force_encoding("utf-8") rescue "No author"
+      duration = compactVideoRenderer["thumbnailOverlays"][0]["thumbnailOverlayTimeStatusRenderer"]["text"]["simpleText"] rescue "No duration"
+
+      video_data << [index + 1, title, author, duration]
+    end
+
+    table = Terminal::Table.new :headings => ['No', 'Title', 'Author', 'Duration'], :rows => video_data
+    puts "Related Videos: "
+    puts table
   end
-
-  table = Terminal::Table.new :headings => ['No', 'Title', 'Author', 'Duration'], :rows => video_data
-  puts "Related Videos: "
-  puts table
 rescue
   puts "Invalid YouTube URL"
 end

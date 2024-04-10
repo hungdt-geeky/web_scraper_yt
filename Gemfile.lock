@@ -1,8 +1,9 @@
 GEM
   remote: https://rubygems.org/
   specs:
-    byebug (11.1.3)
+    coderay (1.1.3)
     json (2.7.2)
+    method_source (1.0.0)
     net-http (0.4.1)
       uri
     nokogiri (1.16.3-aarch64-linux)
@@ -17,6 +18,9 @@ GEM
       racc (~> 1.4)
     nokogiri (1.16.3-x86_64-linux)
       racc (~> 1.4)
+    pry (0.14.2)
+      coderay (~> 1.1)
+      method_source (~> 1.0)
     racc (1.7.3)
     terminal-table (3.0.2)
       unicode-display_width (>= 1.1.1, < 3)
@@ -32,10 +36,10 @@ PLATFORMS
   x86_64-linux
 
 DEPENDENCIES
-  byebug
   json
   net-http
   nokogiri
+  pry
   terminal-table
 
 BUNDLED WITH
